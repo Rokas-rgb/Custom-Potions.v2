@@ -1,0 +1,4 @@
+name: CustomPotions V2
+version: '${project.version}'
+main: me.rockorbonk.candor.custompotionsv2.CustomPotionsV2
+api-version: 1.17
