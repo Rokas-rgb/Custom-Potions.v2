@@ -3,14 +3,37 @@ package me.rockorbonk.candor.custompotionsv2;
 import org.bukkit.Material;
 import org.bukkit.block.BrewingStand;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.BrewerInventory;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class BrewingRecipe {
+public class MainClass extends JavaPlugin {
 
-    private ItemStack ingredient;
-    private ItemStack fuel;
+    @Override
+    public void onEnable() {
+        getServer().getPluginManager().registerEvents(new BrewingRecipe.PotionEvent(), this);
+        new BrewingRecipe(Material.STICK, new CustomPotion() {
+            @Override
+            public void brew(BrewerInventory inventory, ItemStack item, Item ingredient) {
+
+            }
+        });
+    }
+
+    public class BrewingRecipe {
+
+        private static BrewingRecipe[] recipes;
+        private final ItemStack ingredient;
+    private final ItemStack fuel;
 
     private int fuelSet;
     private int fuelCharge;
@@ -50,7 +73,7 @@ public class BrewingRecipe {
     public void setPerfect(boolean perfect) {this.perfect = perfect;}
 
     public static BrewingRecipe getRecipe(BrewerInventory inventory) {
-        for (BrewingRecipe recipe: Brewery.recipes) {
+        for (BrewingRecipe recipe: BrewingRecipe.recipes) {
             if (inventory.getFuel() == null) {
                 if(!recipe.isPerfect() && inventory.getIngredient().getType() == recipe.getIngredient().getType()) {
                     return recipe;
@@ -98,12 +121,12 @@ public class BrewingRecipe {
             this.stand = inventory.getHolder();
             this.before = inventory.getContents();
             this.current = time;
-            runTaskTimer(BrewingRecipe.getInstance(), 0L, 1L);
+            runTaskTimer((Plugin) recipe, 0L, 1L);
         }
 
         @Override
         public void run() {
-            if(current = 0) {
+            if(current == 0) {
                 if(inventory.getIngredient().getAmount() > 1) {
                     ItemStack is = inventory.getIngredient();
                     is.setAmount(inventory.getIngredient().getAmount() - 1);
@@ -155,6 +178,108 @@ public class BrewingRecipe {
                 }
             }
             return true;
+        }
+    }
+
+    public static class PotionEvent implements Listener {
+
+        @EventHandler
+        public void customPotionItemStackClick(InventoryClickEvent event) {
+
+            Inventory inv = event.getClickedInventory();
+
+            if(inv == null || inv.getType() != InventoryType.BREWING) {
+                return;
+            }
+
+            if(!(event.getClick() == ClickType.LEFT || event.getClick() == ClickType.RIGHT)) {
+                return;
+            }
+
+            ItemStack is = event.getCurrentItem();
+            ItemStack is2 = event.getCursor();
+
+            if(event.getClick() == ClickType.RIGHT && is.isSimilar(is2)) {
+                return;
+            }
+
+            event.setCancelled(true);
+
+            Player p = (Player) (event.getView().getPlayer());
+
+            boolean compare = is.isSimilar(is2);
+            ClickType type = event.getClick();
+
+            int firstAmount = is.getAmount();
+            int secondAmount = is2.getAmount();
+
+            int stack = is.getMaxStackSize();
+            int half = firstAmount / 2;
+
+            int clickedSlot = event.getSlot();
+
+            if(type == ClickType.LEFT) {
+
+                if(is == null || (is != null && is.getType() == Material.AIR)) {
+
+                    p.setItemOnCursor(is);
+                    inv.setItem(clickedSlot, is2);
+
+                } else if(compare) {
+
+                    int used = stack - firstAmount;
+                    if(secondAmount <= used) {
+                        is.setAmount(firstAmount + secondAmount);
+                        p.setItemOnCursor(null);
+                        }
+
+                    } else {
+
+                    int used = stack - firstAmount;
+
+                    is2.setAmount(secondAmount - used);
+                    is.setAmount(firstAmount + used);
+                    p.setItemOnCursor(is2);
+                    }
+
+                } else if(!compare) {
+                    inv.setItem(clickedSlot, is2);
+                    p.setItemOnCursor(is);
+
+                } else if ((is2 != null && is.getType() != Material.AIR) && (is2 == null || (is2 != null && is.getType() == Material.AIR))) {
+
+                    ItemStack isClone = is.clone();
+                    isClone.setAmount(is.getAmount() % 2 == 0 ? firstAmount - half : firstAmount - half - 1);
+                    p.setItemOnCursor(isClone);
+
+                    is.setAmount(firstAmount - half);
+
+                } else if(compare) {
+
+                    if((firstAmount + 1) <= stack) {
+
+                        is2.setAmount(secondAmount - 1);
+                        is.setAmount(firstAmount + 1);
+
+                    }
+                } else if(!compare) {
+
+                inv.setItem(clickedSlot, is2);
+                p.setItemOnCursor(is);
+
+                }
+            if (((BrewerInventory) inv).getIngredient() == null) {
+                return;
+                }
+
+                BrewingRecipe recipe = BrewingRecipe.getRecipe((BrewerInventory) inv);
+
+            if(recipe == null) {
+                return;
+                }
+
+            recipe.startBrewing((BrewerInventory) inv);
+            }
         }
     }
 }
